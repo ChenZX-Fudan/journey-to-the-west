@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>西行闯关 · 九九八十一难</title>
+<style>
+/* ============ CSS Reset & Variables ============ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#d4a853; --gold-light:#f0d68a; --red:#c23a2b; --red-dark:#8b1a1a;
+  --jade:#5a9e7c; --ink:#1a1410; --paper:#f5f0e8; --paper-dark:#e8dcc8;
+  --text:#2c2416; --text-light:#6b5d4f; --shadow:0 4px 20px rgba(0,0,0,.3);
+  --radius:12px; --transition:0.3s cubic-bezier(.4,0,.2,1);
+}
+body{
+  font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+  background:linear-gradient(135deg,#1a1410 0%,#2c1f14 30%,#1a1410 60%,#0d0a06 100%);
+  color:var(--paper);min-height:100vh;overflow-x:hidden;
+  background-attachment:fixed;
+}
+body::before{
+  content:'';position:fixed;top:0;left:0;width:100%;height:100%;
+  background:radial-gradient(ellipse at 20% 20%,rgba(212,168,83,.06) 0%,transparent 50%),
+             radial-gradient(ellipse at 80% 80%,rgba(194,58,43,.04) 0%,transparent 50%);
+  pointer-events:none;z-index:0;
+}
+#app{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:12px 16px;display:flex;flex-direction:column;min-height:100vh}
+
+/* ============ Top Title Bar ============ */
+.top-bar{
+  display:flex;align-items:center;justify-content:space-between;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(212,168,83,.15) 0%,transparent 100%);
+  border-bottom:1px solid rgba(212,168,83,.2);border-radius:var(--radius) var(--radius) 0 0;
+}
+.top-bar h1{font-size:1.4em;font-weight:700;background:linear-gradient(90deg,var(--gold-light),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.top-bar .sound-btn{
+  width:36px;height:36px;border-radius:50%;border:1px solid rgba(212,168,83,.3);
+  background:rgba(212,168,83,.1);color:var(--gold);cursor:pointer;font-size:1.2em;
+  display:flex;align-items:center;justify-content:center;transition:var(--transition);
+}
+.top-bar .sound-btn:hover{background:rgba(212,168,83,.2);}
+
+/* ============ Status Bar ============ */
+.status-bar{
+  display:flex;align-items:center;gap:16px;padding:10px 16px;flex-wrap:wrap;
+  background:rgba(0,0,0,.25);border-radius:var(--radius);margin:8px 0;
+  font-size:.9em;
+}
+.status-item{display:flex;align-items:center;gap:6px;white-space:nowrap;}
+.status-item .label{color:var(--text-light);font-size:.8em;}
+.status-item .value{color:var(--gold);font-weight:700;font-size:1.1em;}
+.hearts{display:flex;gap:2px;}
+.heart{font-size:1.1em;transition:var(--transition);}
+.heart.lost{opacity:.2;transform:scale(.8);filter:grayscale(1);}
+
+/* ============ Map Area ============ */
+.map-wrapper{
+  position:relative;margin:8px 0;padding:16px 0;
+  background:rgba(0,0,0,.2);border-radius:var(--radius);
+  overflow:hidden;
+}
+.map-scroll{
+  overflow-x:auto;overflow-y:hidden;padding:10px 40px;
+  scroll-behavior:smooth;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.map-scroll::-webkit-scrollbar{display:none;}
+.map-track{
+  display:flex;align-items:center;gap:0;min-width:max-content;
+  position:relative;padding:20px 0;
+}
+/* The connecting line */
+.map-track::before{
+  content:'';position:absolute;top:50%;left:30px;right:30px;height:3px;
+  background:linear-gradient(90deg,rgba(212,168,83,.3),rgba(212,168,83,.6),rgba(212,168,83,.3));
+  transform:translateY(-50%);z-index:0;border-radius:2px;
+}
+.map-node{
+  position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;
+  width:80px;flex-shrink:0;cursor:default;transition:var(--transition);
+}
+.map-node .icon{
+  width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:1.6em;background:rgba(0,0,0,.5);border:2px solid rgba(212,168,83,.3);
+  transition:var(--transition);position:relative;
+}
+.map-node.visited .icon{background:rgba(90,158,124,.2);border-color:var(--jade);}
+.map-node.current .icon{
+  background:rgba(212,168,83,.2);border-color:var(--gold);
+  box-shadow:0 0 20px rgba(212,168,83,.4),0 0 40px rgba(212,168,83,.15);
+  animation:pulse 2s ease-in-out infinite;
+}
+.map-node.locked .icon{opacity:.4;filter:grayscale(.5);}
+.map-node .name{font-size:.65em;margin-top:6px;text-align:center;color:var(--text-light);line-height:1.2;}
+.map-node.current .name{color:var(--gold);font-weight:700;}
+.map-node.visited .name{color:var(--jade);}
+.map-node .number{
+  position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;
+  background:var(--ink);border:1px solid rgba(212,168,83,.5);font-size:.6em;
+  display:flex;align-items:center;justify-content:center;color:var(--gold);
+}
+.map-node.visited .number{background:var(--jade);border-color:var(--jade);color:#fff;}
+.map-node.current .number{background:var(--gold);border-color:var(--gold);color:var(--ink);font-weight:700;}
+
+/* Node type badges */
+.node-badge{
+  position:absolute;top:-14px;left:50%;transform:translateX(-50%);
+  font-size:.55em;padding:1px 6px;border-radius:10px;white-space:nowrap;
+  background:rgba(0,0,0,.7);color:var(--text-light);
+}
+.node-badge.boss{color:#f87171;border:1px solid rgba(248,113,113,.3);}
+.node-badge.treasure{color:#fbbf24;border:1px solid rgba(251,191,36,.3);}
+.node-badge.maze{color:#a78bfa;border:1px solid rgba(167,139,250,.3);}
+.node-badge.tribulation{color:#38bdf8;border:1px solid rgba(56,189,248,.3);}
+.node-badge.final{color:var(--gold-light);border:1px solid rgba(240,214,138,.5);}
+
+@keyframes pulse{
+  0%,100%{box-shadow:0 0 20px rgba(212,168,83,.4),0 0 40px rgba(212,168,83,.15);}
+  50%{box-shadow:0 0 30px rgba(212,168,83,.6),0 0 60px rgba(212,168,83,.25);}
+}
+
+/* ============ Question Area ============ */
+.question-area{
+  flex:1;display:flex;flex-direction:column;padding:20px;
+  background:linear-gradient(180deg,rgba(0,0,0,.3) 0%,rgba(0,0,0,.15) 100%);
+  border-radius:var(--radius);margin:8px 0;min-height:260px;
+}
+.level-header{text-align:center;margin-bottom:12px;}
+.level-header .level-name{font-size:1.3em;font-weight:700;color:var(--gold);}
+.level-header .level-type{
+  font-size:.75em;color:var(--text-light);margin-top:2px;
+  padding:2px 10px;border-radius:10px;display:inline-block;
+  background:rgba(212,168,83,.1);
+}
+.level-header .level-type.boss-type{background:rgba(248,113,113,.15);color:#f87171;}
+.level-header .level-type.treasure-type{background:rgba(251,191,36,.15);color:#fbbf24;}
+.level-header .level-type.maze-type{background:rgba(167,139,250,.15);color:#a78bfa;}
+.level-header .level-type.final-type{background:rgba(212,168,83,.15);color:var(--gold-light);}
+
+.question-text{
+  font-size:1.15em;text-align:center;margin:16px 0;line-height:1.6;
+  padding:16px;background:rgba(0,0,0,.2);border-radius:var(--radius);
+  border-left:3px solid var(--gold);
+}
+
+/* Boss HP bar */
+.boss-hp-bar{
+  width:100%;height:8px;background:rgba(255,255,255,.1);border-radius:4px;margin:8px 0;overflow:hidden;
+}
+.boss-hp-fill{
+  height:100%;background:linear-gradient(90deg,#f87171,#ef4444);border-radius:4px;
+  transition:width .5s ease;
+}
+
+/* Timer */
+.timer-wrap{
+  display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0;
+}
+.timer-bar{
+  width:200px;height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;
+}
+.timer-fill{
+  height:100%;background:var(--jade);border-radius:3px;transition:width 1s linear;
+}
+.timer-fill.warning{background:#f59e0b;}
+.timer-fill.danger{background:#ef4444;animation:blink .5s linear infinite;}
+.timer-text{font-size:.85em;color:var(--text-light);min-width:60px;text-align:center;}
+@keyframes blink{50%{opacity:.4;}}
+
+/* Options */
+.options-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0;
+}
+.option-btn{
+  padding:14px 16px;font-size:.95em;font-family:inherit;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);
+  border-radius:var(--radius);color:var(--paper);cursor:pointer;
+  transition:var(--transition);text-align:left;display:flex;align-items:center;gap:8px;
+  position:relative;overflow:hidden;
+}
+.option-btn:hover:not(:disabled){
+  background:rgba(212,168,83,.12);border-color:rgba(212,168,83,.4);
+  transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.3);
+}
+.option-btn:active:not(:disabled){transform:translateY(0);}
+.option-btn:disabled{cursor:not-allowed;opacity:.6;}
+.option-btn .letter{
+  width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:.85em;flex-shrink:0;
+  background:rgba(212,168,83,.15);color:var(--gold);
+}
+.option-btn.correct{background:rgba(90,158,124,.2)!important;border-color:var(--jade)!important;}
+.option-btn.correct .letter{background:var(--jade);color:#fff;}
+.option-btn.wrong{background:rgba(194,58,43,.2)!important;border-color:var(--red)!important;animation:shake .5s ease;}
+.option-btn.wrong .letter{background:var(--red);color:#fff;}
+.option-btn.reveal-correct{background:rgba(90,158,124,.1)!important;border-color:rgba(90,158,124,.4)!important;}
+.option-btn.eliminated{opacity:.2;pointer-events:none;text-decoration:line-through;}
+
+@keyframes shake{
+  0%,100%{transform:translateX(0);}
+  20%{transform:translateX(-6px);}
+  40%{transform:translateX(6px);}
+  60%{transform:translateX(-4px);}
+  80%{transform:translateX(4px);}
+}
+
+/* ============ Item/Artifact Bar ============ */
+.item-bar{
+  display:flex;gap:10px;padding:10px 16px;flex-wrap:wrap;
+  background:rgba(0,0,0,.3);border-radius:var(--radius);margin:8px 0;
+  justify-content:center;
+}
+.item-slot{
+  display:flex;align-items:center;gap:6px;padding:8px 14px;
+  background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.1);
+  border-radius:20px;cursor:pointer;transition:var(--transition);
+  position:relative;user-select:none;
+}
+.item-slot:hover:not(.empty){
+  background:rgba(212,168,83,.12);border-color:rgba(212,168,83,.4);
+}
+.item-slot.empty{opacity:.35;cursor:not-allowed;}
+.item-slot .item-icon{font-size:1.4em;}
+.item-slot .item-count{
+  font-size:.75em;font-weight:700;color:var(--gold);
+  min-width:20px;text-align:center;
+}
+.item-slot .item-name{font-size:.7em;color:var(--text-light);}
+.item-slot .hotkey{
+  position:absolute;top:-8px;right:-6px;font-size:.55em;padding:1px 5px;
+  background:var(--ink);border:1px solid rgba(255,255,255,.2);border-radius:8px;
+  color:var(--text-light);
+}
+.item-slot.used{animation:itemUse .4s ease;}
+@keyframes itemUse{
+  0%{transform:scale(1);}
+  50%{transform:scale(1.15);background:rgba(212,168,83,.3);}
+  100%{transform:scale(1);}
+}
+
+/* ============ Overlay / Modal ============ */
+.overlay{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,.75);z-index:100;display:flex;
+  align-items:center;justify-content:center;
+  backdrop-filter:blur(4px);
+}
+.overlay.hidden{display:none;}
+.modal{
+  background:linear-gradient(180deg,#2c1f14 0%,#1a1410 100%);
+  border:1px solid rgba(212,168,83,.3);border-radius:16px;
+  padding:32px 28px;max-width:460px;width:90%;text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+  animation:modalIn .4s ease;
+}
+@keyframes modalIn{
+  from{opacity:0;transform:translateY(30px) scale(.95);}
+  to{opacity:1;transform:translateY(0) scale(1);}
+}
+.modal h2{font-size:1.6em;color:var(--gold);margin-bottom:8px;}
+.modal .subtitle{color:var(--text-light);font-size:.85em;margin-bottom:20px;}
+.modal p{line-height:1.7;margin:8px 0;color:var(--paper);font-size:.95em;}
+.modal .big-icon{font-size:4em;display:block;margin:12px 0;}
+
+.btn{
+  padding:12px 32px;font-size:1em;font-family:inherit;font-weight:700;
+  border:none;border-radius:25px;cursor:pointer;transition:var(--transition);
+  margin:6px;
+}
+.btn-primary{
+  background:linear-gradient(135deg,var(--gold),#b8922e);
+  color:var(--ink);box-shadow:0 4px 15px rgba(212,168,83,.3);
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(212,168,83,.4);}
+.btn-secondary{
+  background:transparent;color:var(--gold);border:1px solid rgba(212,168,83,.4);
+}
+.btn-secondary:hover{background:rgba(212,168,83,.1);}
+
+/* ============ Toast / Floating Messages ============ */
+.toast{
+  position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:200;
+  padding:10px 24px;border-radius:25px;font-weight:700;font-size:.9em;
+  animation:toastIn .3s ease,toastOut .3s ease 1.7s forwards;
+  pointer-events:none;
+}
+.toast.success{background:var(--jade);color:#fff;}
+.toast.error{background:var(--red);color:#fff;}
+.toast.info{background:rgba(56,189,248,.9);color:#fff;}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-20px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+@keyframes toastOut{from{opacity:1;}to{opacity:0;}}
+
+/* ============ Responsive ============ */
+@media(max-width:600px){
+  .top-bar h1{font-size:1.1em;}
+  .options-grid{grid-template-columns:1fr;}
+  .map-node{width:60px;}
+  .map-node .icon{width:40px;height:40px;font-size:1.2em;}
+  .map-node .name{font-size:.55em;}
+  .item-bar{gap:6px;}
+  .item-slot{padding:6px 10px;}
+  .item-slot .item-name{display:none;}
+  .status-bar{gap:8px;font-size:.8em;}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="overlay-container"></div>
+<div id="toast-container"></div>
+
+<script>
+// ============================================================
+// 西行闯关 · 九九八十一难 — Game Engine
+// ============================================================
+
+// ============ Sound Engine (Web Audio API) ============
+const Sound = {
+  ctx: null,
+  init(){ if(!this.ctx) this.ctx = new(window.AudioContext||window.webkitAudioContext)(); },
+  enabled: true,
+  toggle(){ this.enabled=!this.enabled; return this.enabled; },
+  play(freq,type,duration,vol=.1){
+    if(!this.enabled) return;
+    try{ this.init(); const o=this.ctx.createOscillator(); const g=this.ctx.createGain();
+      o.type=type;o.frequency.setValueAtTime(freq,this.ctx.currentTime);
+      g.gain.setValueAtTime(vol,this.ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,this.ctx.currentTime+duration);
+      o.connect(g);g.connect(this.ctx.destination);o.start();o.stop(this.ctx.currentTime+duration);
+    }catch(e){}
+  },
+  correct(){ this.play(523,'sine',.15,.12); setTimeout(()=>this.play(659,'sine',.15,.12),150); setTimeout(()=>this.play(784,'sine',.2,.12),300); },
+  wrong(){ this.play(150,'square',.3,.08); setTimeout(()=>this.play(120,'square',.3,.1),200); },
+  click(){ this.play(800,'sine',.05,.05); },
+  levelUp(){ this.play(440,'sine',.1,.1); setTimeout(()=>this.play(554,'sine',.1,.1),100); setTimeout(()=>this.play(659,'sine',.1,.1),200); setTimeout(()=>this.play(880,'sine',.2,.15),300); },
+  itemUse(){ this.play(600,'triangle',.1,.08); setTimeout(()=>this.play(800,'triangle',.1,.08),100); setTimeout(()=>this.play(1000,'triangle',.15,.08),200); },
+  defeat(){ this.play(200,'sawtooth',.4,.1); setTimeout(()=>this.play(150,'sawtooth',.4,.1),200); setTimeout(()=>this.play(100,'sawtooth',.5,.15),400); },
+  victory(){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>this.play(f,'sine',.25,.15),i*150)); },
+};
+
+// ============ Question Bank (50 questions) ============
+const QUESTIONS = [
+  // --- 人物知识 (15题) ---
+  {q:"孙悟空的第一个师父是谁？", opts:["如来佛祖","菩提祖师","太上老君","观音菩萨"], ans:1, cat:"人物"},
+  {q:"猪八戒被贬下凡前是天庭的什么官职？", opts:["卷帘大将","弼马温","天蓬元帅","托塔天王"], ans:2, cat:"人物"},
+  {q:"沙悟净被贬前在天庭担任什么职务？", opts:["天蓬元帅","弼马温","卷帘大将","八仙之一"], ans:2, cat:"人物"},
+  {q:"白龙马原本是谁的儿子？", opts:["东海龙王","南海龙王","西海龙王","北海龙王"], ans:2, cat:"人物"},
+  {q:"唐僧的俗家姓名是什么？", opts:["陈光蕊","陈玄奘","江流儿","以上都是"], ans:3, cat:"人物"},
+  {q:"孙悟空是从什么地方出生的？", opts:["花果山仙石","东海龙宫","天宫蟠桃园","五行山"], ans:0, cat:"人物"},
+  {q:"红孩儿的父亲是谁？", opts:["太上老君","牛魔王","孙悟空","金翅大鹏"], ans:1, cat:"人物"},
+  {q:"铁扇公主的丈夫是谁？", opts:["孙悟空","牛魔王","猪八戒","红孩儿"], ans:1, cat:"人物"},
+  {q:"观音菩萨的坐骑是什么？", opts:["青狮","白象","金毛犼","金翅大鹏"], ans:2, cat:"人物"},
+  {q:"白骨精先后变成哪三个人？", opts:["少女、老妇、老翁","老妇、少女、老翁","老翁、少女、小孩","少女、小孩、老妇"], ans:0, cat:"人物"},
+  {q:"如来佛祖派谁去寻取经人？", opts:["文殊菩萨","普贤菩萨","观音菩萨","地藏菩萨"], ans:2, cat:"人物"},
+  {q:"孙悟空在花果山自称什么？", opts:["平天大圣","齐天大圣","混天大圣","通天大圣"], ans:1, cat:"人物"},
+  {q:"唐僧一共收了几个徒弟？", opts:["两个","三个","四个","五个"], ans:2, cat:"人物"},
+  {q:"蜘蛛精共有几个姐妹？", opts:["五个","六个","七个","九个"], ans:2, cat:"人物"},
+  {q:"六耳猕猴假扮了谁？", opts:["猪八戒","沙和尚","孙悟空","唐僧"], ans:2, cat:"人物"},
+
+  // --- 情节知识 (15题) ---
+  {q:"孙悟空被压在五行山下多少年？", opts:["三百年","五百年","八百年","一千年"], ans:1, cat:"情节"},
+  {q:"唐僧取经一共经历了多少难？", opts:["七十二难","八十一难","九十九难","一百零八难"], ans:1, cat:"情节"},
+  {q:"孙悟空大闹天宫时偷吃了什么？", opts:["人参果","蟠桃和仙丹","灵芝","龙肝凤髓"], ans:1, cat:"情节"},
+  {q:"火焰山的火是怎么来的？", opts:["天然火山","红孩儿放的火","孙悟空踢翻炼丹炉","太阳真火"], ans:2, cat:"情节"},
+  {q:"车迟国斗法，孙悟空没有比试哪一项？", opts:["求雨","坐禅","隔板猜物","比武"], ans:3, cat:"情节"},
+  {q:"女儿国的国王想嫁给谁？", opts:["孙悟空","猪八戒","唐僧","沙和尚"], ans:2, cat:"情节"},
+  {q:"孙悟空用什么方法灭了火焰山的火？", opts:["芭蕉扇","甘露水","请龙王降雨","用金箍棒打灭"], ans:0, cat:"情节"},
+  {q:"通天河的老鼋为什么把经书弄湿了？", opts:["故意捣乱","不小心","因唐僧忘记帮他问佛祖","被妖怪指使"], ans:2, cat:"情节"},
+  {q:"孙悟空被如来佛祖压在哪座山下？", opts:["五指山","五行山","两界山","五行山(与两界山是同一座)"], ans:3, cat:"情节"},
+  {q:"黄袍怪把唐僧变成了什么动物？", opts:["猪","老虎","兔子","狗"], ans:1, cat:"情节"},
+  {q:"金角大王和银角大王的宝物不包括？", opts:["紫金红葫芦","羊脂玉净瓶","芭蕉扇","晃金绳"], ans:2, cat:"情节"},
+  {q:"孙悟空为什么被唐僧赶走（第一次）？", opts:["打死了强盗","打死了白骨精变化的三人","偷吃人参果","大闹天宫"], ans:1, cat:"情节"},
+  {q:"真假美猴王最后是谁分辨出来的？", opts:["观音菩萨","玉皇大帝","如来佛祖","唐僧"], ans:2, cat:"情节"},
+  {q:"狮驼岭三魔中大哥是谁？", opts:["青毛狮子","黄牙老象","金翅大鹏","九头狮子"], ans:0, cat:"情节"},
+  {q:"最后阿难、迦叶给唐僧的是什么？", opts:["真经","无字经书","假经","空白经卷"], ans:1, cat:"情节"},
+
+  // --- 法宝兵器 (10题) ---
+  {q:"猪八戒的兵器叫什么？", opts:["金箍棒","九齿钉耙","降妖宝杖","方天画戟"], ans:1, cat:"法宝"},
+  {q:"沙和尚的兵器是什么？", opts:["金箍棒","九齿钉耙","降妖宝杖","月牙铲"], ans:2, cat:"法宝"},
+  {q:"金箍棒的重量是多少？", opts:["一万三千斤","一万三千五百斤","一万八千斤","十万八千斤"], ans:1, cat:"法宝"},
+  {q:"太上老君的法宝不包括？", opts:["金刚琢","紫金红葫芦","幌金绳","九齿钉耙"], ans:3, cat:"法宝"},
+  {q:"观音菩萨给孙悟空的三根毫毛有什么用？", opts:["救命用","变出分身","变出兵器","飞行"], ans:0, cat:"法宝"},
+  {q:"人参果生长在哪里？", opts:["万寿山五庄观","花果山","蟠桃园","灵山"], ans:0, cat:"法宝"},
+  {q:"吃了人参果能怎样？", opts:["长生不老","活四万七千年","法力大增","刀枪不入"], ans:1, cat:"法宝"},
+  {q:"紫金红葫芦的功能是什么？", opts:["装丹药","叫人名字，答应了就被收进去","喷火","变大变小"], ans:1, cat:"法宝"},
+  {q:"八卦炉中炼出了孙悟空的什么能力？", opts:["七十二变","筋斗云","火眼金睛","金刚不坏"], ans:2, cat:"法宝"},
+  {q:"孙悟空向东海龙王借兵器时，最后拿了什么？", opts:["方天画戟","九股叉","金箍棒","双锤"], ans:2, cat:"法宝"},
+
+  // --- 文化常识 (10题) ---
+  {q:"西天取经的'西天'指今天的哪里？", opts:["阿拉伯","印度","波斯","西藏"], ans:1, cat:"文化"},
+  {q:"《西游记》的作者是谁？", opts:["罗贯中","施耐庵","吴承恩","曹雪芹"], ans:2, cat:"文化"},
+  {q:"唐僧西行取经，在历史上的原型是谁？", opts:["法显","玄奘","鉴真","义净"], ans:1, cat:"文化"},
+  {q:"孙悟空一个筋斗能翻多远？", opts:["一万八千里","五万四千里","十万八千里","十万八千里整"], ans:2, cat:"文化"},
+  {q:"《西游记》中孙悟空被称为什么？", opts:["美猴王","齐天大圣","斗战胜佛","以上都是"], ans:3, cat:"文化"},
+  {q:"五指山在现实中对应哪座山？", opts:["五行山没有确切对应","泰山","华山","峨眉山"], ans:0, cat:"文化"},
+  {q:"猪八戒的法名是什么？", opts:["悟能","悟净","悟空","悟明"], ans:0, cat:"文化"},
+  {q:"沙和尚的法名是什么？", opts:["悟能","悟净","悟空","悟明"], ans:1, cat:"文化"},
+  {q:"取经团队到达灵山后，唐僧被封为什么？", opts:["斗战胜佛","净坛使者","金身罗汉","旃檀功德佛"], ans:3, cat:"文化"},
+  {q:"取经成功后，孙悟空被封为什么？", opts:["净坛使者","斗战胜佛","金身罗汉","旃檀功德佛"], ans:1, cat:"文化"},
+];
+
+// Fix any typos
+QUESTIONS.forEach(q=>{if(q.opts===undefined&&q.options)q.opts=q.options;});
+
+// ============ Level Definitions ============
+const LEVELS = [
+  {id:1,  name:"长安",     icon:"🏯", type:"quiz",       title:"起点 · 长安",     desc:"唐王送别，踏上西行之路",          timer:30, questions:3},
+  {id:2,  name:"五行山",   icon:"🏔️", type:"quiz",       title:"收徒 · 五行山",   desc:"解救孙悟空，收为大徒弟",          timer:30, questions:3},
+  {id:3,  name:"鹰愁涧",   icon:"🌊", type:"quiz",       title:"收白龙 · 鹰愁涧", desc:"降服白龙马，得坐骑",              timer:30, questions:3},
+  {id:4,  name:"高老庄",   icon:"🐷", type:"quiz",       title:"收徒 · 高老庄",   desc:"收服猪八戒",                      timer:30, questions:3},
+  {id:5,  name:"流沙河",   icon:"🏞️", type:"quiz",       title:"收徒 · 流沙河",   desc:"收服沙悟净，团队齐聚",            timer:30, questions:3},
+  {id:6,  name:"白虎岭",   icon:"💀", type:"boss",       title:"BOSS · 三打白骨精",desc:"连续答对3题，识破妖怪伪装！",    timer:25, questions:3, bossName:"白骨精",bossIcon:"💀"},
+  {id:7,  name:"五庄观",   icon:"🌳", type:"treasure",   title:"宝物 · 五庄观",   desc:"答对题目，摇人参果树得法宝！",    timer:30, questions:1},
+  {id:8,  name:"火焰山",   icon:"🔥", type:"boss",       title:"BOSS · 火焰山",   desc:"连续答对3题，借芭蕉扇灭火！",     timer:25, questions:3, bossName:"铁扇公主",bossIcon:"🔥"},
+  {id:9,  name:"盘丝洞",   icon:"🕸️", type:"maze",       title:"迷宫 · 盘丝洞",   desc:"答对前进，答错后退，走出蜘蛛洞！", timer:25, questions:99, mazeSize:3},
+  {id:10,name:"通天河",   icon:"🐢", type:"tribulation",title:"渡劫 · 通天河",   desc:"老鼋问卦：一题定乾坤！",          timer:20, questions:1, penaltyHearts:2},
+  {id:11,name:"小雷音寺", icon:"🏛️", type:"boss",       title:"BOSS · 小雷音寺", desc:"连续答对4题，识破假雷音！",        timer:22, questions:4, bossName:"黄眉大王",bossIcon:"🏛️"},
+  {id:12,name:"大雷音寺", icon:"🕉️", type:"final",      title:"终章 · 大雷音寺", desc:"终极考验：5题连答，取得真经！",     timer:20, questions:5},
+];
+
+// ============ Game State ============
+const state = {
+  currentLevel: 0,       // index into LEVELS
+  hearts: 5,
+  maxHearts: 5,
+  score: 0,
+  combo: 0,
+  maxCombo: 0,
+  items: {
+    kasaya: 0,       // 👘 锦斓袈裟 - skip question
+    curse: 2,        // 🔔 紧箍咒 - 50/50
+    cloud: 0,        // ☁️ 筋斗云 - jump 2 spaces
+    eyes: 0,         // 👁️ 火眼金睛 - hint
+    peach: 0,        // 🍑 人参果 - +1 heart
+    staff: 1,        // 🏏 金箍棒 - nullify boss penalty
+  },
+  // Per-level state
+  levelQuestions: [],    // questions assigned to current level
+  levelQuestionIdx: 0,   // which question we're on
+  bossCorrectStreak: 0,  // consecutive correct in boss fight
+  mazePosition: 0,       // current position in maze
+  answered: false,       // whether current question is answered
+  timerInterval: null,
+  timeLeft: 30,
+  gameOver: false,
+  gameWin: false,
+  visitedLevels: new Set(),
+};
+
+// ============ DOM Helpers ============
+const $ = (sel)=>document.querySelector(sel);
+const $$ = (sel)=>document.querySelectorAll(sel);
+const app = ()=>$('#app');
+const overlayContainer = ()=>$('#overlay-container');
+const toastContainer = ()=>$('#toast-container');
+
+function showToast(msg, type='info'){
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  toastContainer().appendChild(el);
+  setTimeout(()=>el.remove(), 2200);
+}
+
+// ============ Shuffle ============
+function shuffle(arr){
+  const a = [...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
+// ============ Question Selection ============
+function pickQuestionsForLevel(level, count){
+  // Pick `count` random questions, avoiding repeats within the level
+  const pool = shuffle(QUESTIONS);
+  return pool.slice(0, Math.min(count, pool.length));
+}
+
+// ============ Timer ============
+function startTimer(seconds){
+  clearInterval(state.timerInterval);
+  state.timeLeft = seconds;
+  state.answered = false;
+  updateTimerDisplay();
+  state.timerInterval = setInterval(()=>{
+    state.timeLeft--;
+    updateTimerDisplay();
+    if(state.timeLeft <= 0){
+      clearInterval(state.timerInterval);
+      if(!state.answered) handleTimeout();
+    }
+  }, 1000);
+}
+
+function stopTimer(){
+  clearInterval(state.timerInterval);
+}
+
+function updateTimerDisplay(){
+  const fill = $('.timer-fill');
+  const text = $('.timer-text');
+  if(!fill||!text) return;
+  const level = LEVELS[state.currentLevel];
+  const total = level.timer;
+  const pct = (state.timeLeft/total)*100;
+  fill.style.width = pct+'%';
+  fill.classList.remove('warning','danger');
+  if(pct<30) fill.classList.add('danger');
+  else if(pct<60) fill.classList.add('warning');
+  text.textContent = `⏱ ${state.timeLeft}秒`;
+}
+
+// ============ Rendering ============
+function render(){
+  app().innerHTML = `
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <h1>🏮 西行闯关 · 九九八十一难</h1>
+      <button class="sound-btn" onclick="toggleSound()" title="音效开关">${Sound.enabled?'🔊':'🔇'}</button>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <div class="status-item">
+        <span class="label">📍</span>
+        <span class="value">第${state.currentLevel+1}关 · ${LEVELS[state.currentLevel].name}</span>
+      </div>
+      <div class="status-item">
+        <span class="label">❤️</span>
+        <span class="hearts">${renderHearts()}</span>
+      </div>
+      <div class="status-item">
+        <span class="label">📜</span>
+        <span class="value">${state.score}分</span>
+      </div>
+      <div class="status-item">
+        <span class="label">🔥</span>
+        <span class="value">连击×${state.combo}</span>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div class="map-wrapper">
+      <div class="map-scroll" id="mapScroll">
+        <div class="map-track">
+          ${LEVELS.map((l,i)=>renderMapNode(l,i)).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Question Area -->
+    <div class="question-area">
+      ${renderQuestionArea()}
+    </div>
+
+    <!-- Item Bar -->
+    <div class="item-bar">
+      ${renderItem('kasaya','👘','锦斓袈裟','跳过题目','Q')}
+      ${renderItem('curse','🔔','紧箍咒','50/50排除','W')}
+      ${renderItem('cloud','☁️','筋斗云','前进2格','E')}
+      ${renderItem('eyes','👁️','火眼金睛','答案提示','R')}
+      ${renderItem('peach','🍑','人参果','回复1命','T')}
+      ${renderItem('staff','🏏','金箍棒','免答错惩罚','Y')}
+    </div>
+  `;
+
+  // Scroll map to current position
+  setTimeout(()=>{
+    const scroll = $('#mapScroll');
+    if(scroll){
+      const currentNode = scroll.querySelector('.current');
+      if(currentNode){
+        currentNode.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+      }
+    }
+  },100);
+}
+
+function renderHearts(){
+  let html = '';
+  for(let i=0;i<state.maxHearts;i++){
+    html += `<span class="heart${i>=state.hearts?' lost':''}">❤️</span>`;
+  }
+  return html;
+}
+
+function renderMapNode(level, index){
+  let cls = 'locked';
+  if(index < state.currentLevel) cls = 'visited';
+  else if(index === state.currentLevel) cls = 'current';
+
+  let badge = '';
+  if(level.type==='boss') badge = `<span class="node-badge boss">BOSS</span>`;
+  else if(level.type==='treasure') badge = `<span class="node-badge treasure">宝物</span>`;
+  else if(level.type==='maze') badge = `<span class="node-badge maze">迷宫</span>`;
+  else if(level.type==='tribulation') badge = `<span class="node-badge tribulation">渡劫</span>`;
+  else if(level.type==='final') badge = `<span class="node-badge final">终点</span>`;
+
+  return `
+    <div class="map-node ${cls}">
+      ${badge}
+      <div class="icon">
+        ${level.icon}
+        <span class="number">${index+1}</span>
+      </div>
+      <div class="name">${level.name}</div>
+    </div>
+  `;
+}
+
+function renderQuestionArea(){
+  const level = LEVELS[state.currentLevel];
+  const typeCls = level.type+'-type';
+
+  let questionHTML = '';
+  if(state.gameWin){
+    questionHTML = renderVictory();
+  } else if(state.gameOver){
+    questionHTML = renderDefeat();
+  } else if(state.answered){
+    questionHTML = renderAnswered();
+  } else if(state.levelQuestions.length === 0){
+    questionHTML = renderLevelIntro();
+  } else {
+    questionHTML = renderActiveQuestion();
+  }
+
+  return `
+    <div class="level-header">
+      <div class="level-name">${level.icon} ${level.title}</div>
+      <div class="level-type ${typeCls}">${level.desc}</div>
+    </div>
+    ${questionHTML}
+  `;
+}
+
+function renderLevelIntro(){
+  const level = LEVELS[state.currentLevel];
+  let extra = '';
+  if(level.type==='boss'){
+    extra = `<div class="boss-hp-bar"><div class="boss-hp-fill" style="width:100%"></div></div>
+             <p style="text-align:center;color:#f87171;font-size:.9em;">👹 ${level.bossName} 拦住了去路！需要连续答对 ${level.questions} 题才能击败！</p>`;
+  } else if(level.type==='maze'){
+    extra = `<p style="text-align:center;color:#a78bfa;font-size:.9em;">🕸️ 盘丝洞内蜘蛛网密布，答对前进，答错后退！需走 ${level.mazeSize} 格才能出去</p>
+             <div style="display:flex;justify-content:center;gap:6px;margin:8px 0;">
+               ${Array.from({length:level.mazeSize},(_,i)=>`<span style="font-size:1.5em;opacity:${i<state.mazePosition?'.5':i===state.mazePosition?'1':'.2'}">🕷️</span>`).join('→')}
+               <span style="font-size:1.5em;">🚪</span>
+             </div>`;
+  } else if(level.type==='tribulation'){
+    extra = `<p style="text-align:center;color:#38bdf8;font-size:.9em;">🐢 老鼋驮你过河，但有一个问题...答错扣 ${level.penaltyHearts} 条命！</p>`;
+  } else if(level.type==='final'){
+    extra = `<p style="text-align:center;color:var(--gold-light);font-size:.9em;">🙏 ${level.questions} 题连答，终极考验！</p>`;
+  }
+  return `
+    <div style="text-align:center;padding:20px;">
+      ${extra}
+      <button class="btn btn-primary" onclick="startLevel()" style="margin-top:16px;font-size:1.1em;">
+        ${level.type==='boss'?'⚔️ 迎战':'🚀 开始挑战'}
+      </button>
+    </div>
+  `;
+}
+
+function renderActiveQuestion(){
+  if(state.levelQuestionIdx >= state.levelQuestions.length) return renderLevelIntro();
+  const q = state.levelQuestions[state.levelQuestionIdx];
+  const level = LEVELS[state.currentLevel];
+  const eliminated = state._eliminated || [];
+
+  let bossHTML = '';
+  if(level.type==='boss'){
+    const total = level.questions;
+    const done = state.bossCorrectStreak;
+    const pct = (done/total)*100;
+    bossHTML = `
+      <div style="display:flex;align-items:center;gap:8px;justify-content:center;margin:8px 0;">
+        <span>${level.bossIcon}</span>
+        <div class="boss-hp-bar" style="flex:1;max-width:250px;">
+          <div class="boss-hp-fill" style="width:${100-pct}%;background:${100-pct<30?'#22c55e':''}"></div>
+        </div>
+        <span style="color:#f87171;font-size:.85em;">${done}/${total}</span>
+      </div>`;
+  }
+
+  return `
+    ${bossHTML}
+    <div class="question-text">📜 ${q.q}</div>
+    <div class="timer-wrap">
+      <div class="timer-bar"><div class="timer-fill" style="width:100%"></div></div>
+      <div class="timer-text">⏱ ${level.timer}秒</div>
+    </div>
+    <div class="options-grid">
+      ${q.opts.map((opt,i)=>`
+        <button class="option-btn${eliminated.includes(i)?' eliminated':''}" onclick="answerQuestion(${i})" ${eliminated.includes(i)?'disabled':''}>
+          <span class="letter">${'ABCD'[i]}</span>
+          <span>${eliminated.includes(i)?'❌ 已排除':opt}</span>
+        </button>
+      `).join('')}
+    </div>
+    ${level.type==='final' && state.levelQuestionIdx>0 ? `<p style="text-align:center;color:var(--gold);font-size:.85em;">已完成 ${state.levelQuestionIdx}/${level.questions} 题</p>`:''}
+  `;
+}
+
+function renderAnswered(){
+  const q = state.levelQuestions[state.levelQuestionIdx - 1] || state.levelQuestions[state.levelQuestionIdx];
+  if(!q) return renderLevelIntro();
+  const level = LEVELS[state.currentLevel];
+  return `
+    <div class="question-text">📜 ${q.q}</div>
+    <p style="text-align:center;color:${state._lastCorrect?'var(--jade)':'var(--red)'};font-size:1.1em;font-weight:700;">
+      ${state._lastCorrect?'✅ 回答正确！':'❌ 回答错误！'}
+    </p>
+    <p style="text-align:center;color:var(--text-light);font-size:.85em;">
+      正确答案：${'ABCD'[q.ans]}. ${q.opts[q.ans]}
+    </p>
+    <div style="text-align:center;margin-top:16px;">
+      <button class="btn btn-primary" onclick="nextQuestion()">▶ 继续</button>
+    </div>
+  `;
+}
+
+function renderVictory(){
+  const stars = state.hearts >= 5 ? 3 : state.hearts >= 3 ? 2 : 1;
+  const titles = ['','金身罗汉','净坛使者','斗战胜佛'];
+  return `
+    <div style="text-align:center;padding:10px;">
+      <span class="big-icon" style="font-size:3em;display:block;">🕉️</span>
+      <h2 style="color:var(--gold);margin:8px 0;">🏆 取经成功！</h2>
+      <p style="font-size:1.2em;color:var(--gold-light);">${'⭐'.repeat(stars)}</p>
+      <p>称号：<strong style="color:var(--gold);">${titles[stars]}</strong></p>
+      <p>总分：<strong>${state.score}</strong> 分</p>
+      <p>剩余生命：${'❤️'.repeat(state.hearts)}</p>
+      <p>最高连击：<strong>×${state.maxCombo}</strong></p>
+      <button class="btn btn-primary" onclick="resetGame()" style="margin-top:12px;">🔄 再取一次经</button>
+    </div>
+  `;
+}
+
+function renderDefeat(){
+  return `
+    <div style="text-align:center;padding:10px;">
+      <span class="big-icon" style="font-size:3em;display:block;">💀</span>
+      <h2 style="color:var(--red);margin:8px 0;">取经失败...</h2>
+      <p>所有生命耗尽，师徒四人被妖怪抓走了...</p>
+      <p>到达：<strong>第${state.currentLevel+1}关 · ${LEVELS[state.currentLevel].name}</strong></p>
+      <p>总分：<strong>${state.score}</strong> 分</p>
+      <button class="btn btn-primary" onclick="resetGame()" style="margin-top:12px;">🔄 重新出发</button>
+    </div>
+  `;
+}
+
+function renderItem(key, icon, name, desc, hotkey){
+  const count = state.items[key];
+  const cls = count <= 0 ? 'empty' : '';
+  return `
+    <div class="item-slot ${cls}" onclick="useItem('${key}')" title="${name}: ${desc}">
+      <span class="hotkey">${hotkey}</span>
+      <span class="item-icon">${icon}</span>
+      <span class="item-count">×${count}</span>
+      <span class="item-name">${name}</span>
+    </div>
+  `;
+}
+
+// ============ Game Logic ============
+function initGame(){
+  state.currentLevel = 0;
+  state.hearts = 5;
+  state.maxHearts = 5;
+  state.score = 0;
+  state.combo = 0;
+  state.maxCombo = 0;
+  state.items = {kasaya:0,curse:2,cloud:0,eyes:0,staff:1,peach:0};
+  state.levelQuestions = [];
+  state.levelQuestionIdx = 0;
+  state.bossCorrectStreak = 0;
+  state.mazePosition = 0;
+  state.answered = false;
+  state.gameOver = false;
+  state.gameWin = false;
+  state.visitedLevels = new Set();
+  state._eliminated = [];
+  state._lastCorrect = null;
+  stopTimer();
+  render();
+  showStartOverlay();
+}
+
+function showStartOverlay(){
+  overlayContainer().innerHTML = `
+    <div class="overlay">
+      <div class="modal">
+        <span class="big-icon">🏮</span>
+        <h2>西行闯关</h2>
+        <p class="subtitle">九九八十一难 · 问答闯关</p>
+        <p>从长安出发，一路向西，答对题目才能前进！</p>
+        <p style="font-size:.85em;color:var(--text-light);">
+          共有 <strong>12关</strong> · 每关类型不同<br>
+          ❤️ 5条命 · 💡 法宝助阵<br>
+          到达大雷音寺即取经成功！
+        </p>
+        <p style="font-size:.8em;color:var(--text-light);">
+          🎮 快捷键：Q~Y使用法宝 | 1~4答题
+        </p>
+        <button class="btn btn-primary" onclick="startGame()" style="font-size:1.1em;">🚀 踏上西行路</button>
+      </div>
+    </div>
+  `;
+}
+
+function startGame(){
+  overlayContainer().innerHTML = '';
+  Sound.click();
+  startLevel();
+}
+
+function startLevel(){
+  const level = LEVELS[state.currentLevel];
+  state.visitedLevels.add(state.currentLevel);
+
+  let count = level.questions;
+  if(level.type==='maze') count = 1; // maze: one question per step
+  if(level.type==='tribulation') count = 1;
+
+  state.levelQuestions = pickQuestionsForLevel(level, count);
+  state.levelQuestionIdx = 0;
+  state.bossCorrectStreak = 0;
+  state.mazePosition = 0;
+  state.answered = false;
+  state._eliminated = [];
+  state._lastCorrect = null;
+  render();
+
+  // If there are questions, start the first one
+  if(state.levelQuestions.length > 0){
+    startTimer(level.timer);
+  }
+  scrollMapToCurrent();
+}
+
+function answerQuestion(choiceIdx){
+  if(state.answered) return;
+  state.answered = true;
+  stopTimer();
+  Sound.click();
+
+  const q = state.levelQuestions[state.levelQuestionIdx];
+  const isCorrect = choiceIdx === q.ans;
+  state._lastCorrect = isCorrect;
+
+  // Highlight options
+  const btns = $$('.option-btn');
+  btns.forEach((btn,i)=>{
+    btn.disabled = true;
+    if(i === q.ans) btn.classList.add('correct');
+    if(i === choiceIdx && !isCorrect) btn.classList.add('wrong');
+    if(i === choiceIdx && isCorrect) btn.classList.add('correct');
+    else if(!isCorrect && i === q.ans) btn.classList.add('reveal-correct');
+  });
+
+  if(isCorrect){
+    handleCorrect();
+  } else {
+    handleWrong();
+  }
+
+  render();
+  scrollMapToCurrent();
+}
+
+function handleCorrect(){
+  Sound.correct();
+  const level = LEVELS[state.currentLevel];
+  state.combo++;
+  if(state.combo > state.maxCombo) state.maxCombo = state.combo;
+
+  // Score: base + combo bonus + time bonus
+  const timeBonus = Math.floor(state.timeLeft / 5);
+  const comboBonus = Math.floor(state.combo / 3);
+  const points = 100 + timeBonus * 10 + comboBonus * 20;
+  state.score += points;
+
+  // Continuous correct = item reward every 3
+  const totalCorrect = state.score > 0 ? Math.floor(state.score / 300) : 0; // roughly every 3 correct answers
+  if(state.combo > 0 && state.combo % 3 === 0) {
+    const itemKeys = ['kasaya','curse','cloud','peach'];
+    const key = itemKeys[Math.floor(Math.random()*itemKeys.length)];
+    state.items[key]++;
+    showToast(`🎁 连续答对奖励：${getItemName(key)} +1！`,'success');
+    Sound.itemUse();
+  }
+
+  state.levelQuestionIdx++;
+
+  // Handle per level type
+  if(level.type === 'boss'){
+    state.bossCorrectStreak++;
+    if(state.bossCorrectStreak >= level.questions){
+      // Boss defeated!
+      showToast(`⚔️ ${level.bossName} 被击败！`,'success');
+      Sound.levelUp();
+      advanceLevel();
+      return;
+    }
+  } else if(level.type === 'maze'){
+    state.mazePosition++;
+    if(state.mazePosition >= level.mazeSize){
+      showToast('🕸️ 走出了盘丝洞！','success');
+      Sound.levelUp();
+      advanceLevel();
+      return;
+    }
+    // Continue maze - new question
+    state.levelQuestions = pickQuestionsForLevel(level, 1);
+    state.levelQuestionIdx = 0;
+  } else if(level.type === 'tribulation'){
+    showToast('🐢 老鼋满意答案，驮你过河！','success');
+    Sound.levelUp();
+    advanceLevel();
+    return;
+  } else if(level.type === 'treasure'){
+    // Grant a random treasure item
+    const treasurePool = ['kasaya','cloud','eyes','peach','curse','staff'];
+    const treasureKey = treasurePool[Math.floor(Math.random()*treasurePool.length)];
+    state.items[treasureKey]++;
+    showToast(`🌳 摇动人参果树！获得 ${getItemName(treasureKey)} +1！`,'success');
+    Sound.itemUse();
+    Sound.levelUp();
+    advanceLevel();
+    return;
+  } else {
+    // Normal quiz or final - check if level complete
+    if(state.levelQuestionIdx >= level.questions){
+      Sound.levelUp();
+      advanceLevel();
+      return;
+    }
+    // Quiz/final: stay on answered screen, let user click Continue
+    return;
+  }
+
+  // Auto-advance for boss/maze (rapid-fire flow)
+  state.answered = false;
+  state._eliminated = [];
+  render();
+  startTimer(level.timer);
+  scrollMapToCurrent();
+}
+
+function handleWrong(){
+  Sound.wrong();
+  const level = LEVELS[state.currentLevel];
+  state.combo = 0;
+
+  // Check if staff (金箍棒) can nullify
+  if(level.type === 'boss' && state.items.staff > 0){
+    state.items.staff--;
+    showToast('🏏 金箍棒抵消了这次答错！','info');
+    Sound.itemUse();
+    state.levelQuestionIdx++;
+    state.bossCorrectStreak++;
+    if(state.bossCorrectStreak >= level.questions){
+      showToast(`⚔️ ${level.bossName} 被击败！`,'success');
+      Sound.levelUp();
+      advanceLevel();
+      return;
+    }
+    state.answered = false;
+    state._eliminated = [];
+    state.levelQuestions = pickQuestionsForLevel(level, level.questions - state.levelQuestionIdx);
+    if(state.levelQuestions.length === 0) state.levelQuestions = pickQuestionsForLevel(level, 1);
+    state.levelQuestionIdx = 0;
+    render();
+    startTimer(level.timer);
+    scrollMapToCurrent();
+    return;
+  }
+
+  // Normal penalty
+  const penalty = level.type === 'tribulation' ? (level.penaltyHearts || 2) : 1;
+  state.hearts -= penalty;
+  if(state.hearts < 0) state.hearts = 0;
+
+  showToast(`❌ 答错了！扣 ${penalty} 条命`,'error');
+
+  if(state.hearts <= 0){
+    state.gameOver = true;
+    stopTimer();
+    Sound.defeat();
+    render();
+    return;
+  }
+
+  // Reset for retry (same level position)
+  if(level.type === 'boss'){
+    state.bossCorrectStreak = 0; // Reset boss streak
+    state.levelQuestions = pickQuestionsForLevel(level, level.questions);
+    state.levelQuestionIdx = 0;
+    state.answered = false;
+    state._eliminated = [];
+    render();
+    startTimer(level.timer);
+    scrollMapToCurrent();
+  } else if(level.type === 'maze'){
+    state.mazePosition = Math.max(0, state.mazePosition - 1); // Move back
+    state.levelQuestions = pickQuestionsForLevel(level, 1);
+    state.levelQuestionIdx = 0;
+    state.answered = false;
+    state._eliminated = [];
+    render();
+    startTimer(level.timer);
+    scrollMapToCurrent();
+  } else {
+    // For quiz/final/treasure: replace failed question, keep progress
+    // Stay on answered screen, let user click Continue
+    state.levelQuestions[state.levelQuestionIdx] = pickQuestionsForLevel(level, 1)[0];
+  }
+}
+
+function handleTimeout(){
+  if(state.answered) return;
+  state.answered = true;
+  state._lastCorrect = false;
+  Sound.wrong();
+  const level = LEVELS[state.currentLevel];
+  state.combo = 0;
+  const penalty = level.type === 'tribulation' ? (level.penaltyHearts || 2) : 1;
+  state.hearts -= penalty;
+  if(state.hearts < 0) state.hearts = 0;
+  showToast('⏰ 时间到！','error');
+
+  const q = state.levelQuestions[state.levelQuestionIdx];
+  const btns = $$('.option-btn');
+  btns.forEach((btn,i)=>{
+    btn.disabled = true;
+    if(i === q.ans) btn.classList.add('reveal-correct');
+  });
+
+  if(state.hearts <= 0){
+    state.gameOver = true;
+    stopTimer();
+    Sound.defeat();
+    render();
+    return;
+  }
+
+  if(level.type === 'boss') state.bossCorrectStreak = 0;
+  if(level.type === 'maze') state.mazePosition = Math.max(0, state.mazePosition - 1);
+
+  render();
+  // Auto-continue after timeout
+  setTimeout(()=>{
+    if(!state.gameOver && !state.gameWin){
+      const rem = level.type==='boss'?level.questions:level.type==='maze'?1:level.questions-state.levelQuestionIdx;
+      state.levelQuestions = pickQuestionsForLevel(level, Math.max(1,rem));
+      state.levelQuestionIdx = 0;
+      state.answered = false;
+      state._eliminated = [];
+      render();
+      startTimer(level.timer);
+      scrollMapToCurrent();
+    }
+  }, 2000);
+}
+
+function advanceLevel(){
+  stopTimer();
+  state.currentLevel++;
+  state.visitedLevels.add(state.currentLevel - 1);
+
+  if(state.currentLevel >= LEVELS.length){
+    // WIN!
+    state.gameWin = true;
+    Sound.victory();
+    render();
+    return;
+  }
+
+  showToast(`📍 到达 ${LEVELS[state.currentLevel].name}！`,'success');
+  state.levelQuestions = [];
+  state.levelQuestionIdx = 0;
+  state.answered = false;
+  state._eliminated = [];
+  render();
+  scrollMapToCurrent();
+}
+
+function nextQuestion(){
+  const level = LEVELS[state.currentLevel];
+  if(state.gameOver || state.gameWin) return;
+
+  // If we just finished a level's last question
+  if(level.type === 'quiz' || level.type === 'treasure' || level.type === 'final'){
+    if(state.levelQuestionIdx >= level.questions){
+      advanceLevel();
+      return;
+    }
+  }
+
+  state.answered = false;
+  state._eliminated = [];
+  render();
+  startTimer(level.timer);
+  scrollMapToCurrent();
+}
+
+// ============ Item Usage ============
+function useItem(key){
+  if(state.answered || state.gameOver || state.gameWin) return;
+  if(state.items[key] <= 0) return;
+
+  const level = LEVELS[state.currentLevel];
+  Sound.click();
+
+  switch(key){
+    case 'kasaya': // 👘 Skip question
+      state.items.kasaya--;
+      stopTimer();
+      showToast('👘 锦斓袈裟：跳过此题！','info');
+      Sound.itemUse();
+      state.levelQuestionIdx++;
+      if(state.levelQuestionIdx >= level.questions){
+        advanceLevel();
+      } else {
+        state.answered = false;
+        state._eliminated = [];
+        render();
+        startTimer(level.timer);
+        scrollMapToCurrent();
+      }
+      break;
+
+    case 'curse': // 🔔 50/50
+      state.items.curse--;
+      Sound.itemUse();
+      const q = state.levelQuestions[state.levelQuestionIdx];
+      const wrongs = q.opts.map((_,i)=>i).filter(i=>i!==q.ans);
+      const toElim = shuffle(wrongs).slice(0, 2);
+      state._eliminated = toElim;
+      showToast('🔔 紧箍咒：排除两个错误选项！','info');
+      render();
+      startTimer(state.timeLeft); // restart timer display
+      break;
+
+    case 'cloud': // ☁️ Jump 2 levels
+      state.items.cloud--;
+      stopTimer();
+      Sound.itemUse();
+      const skip = Math.min(2, LEVELS.length - 1 - state.currentLevel);
+      state.currentLevel += skip;
+      showToast(`☁️ 筋斗云：飞跃 ${skip} 关！`,'info');
+      state.levelQuestions = [];
+      state.levelQuestionIdx = 0;
+      state.answered = false;
+      state._eliminated = [];
+      state.bossCorrectStreak = 0;
+      state.mazePosition = 0;
+      if(state.currentLevel >= LEVELS.length){
+        state.gameWin = true;
+        Sound.victory();
+      }
+      render();
+      scrollMapToCurrent();
+      break;
+
+    case 'eyes': // 👁️ Hint
+      state.items.eyes--;
+      Sound.itemUse();
+      const q2 = state.levelQuestions[state.levelQuestionIdx];
+      const hint = q2.opts[q2.ans];
+      showToast(`👁️ 火眼金睛：答案是 "${hint}"`,'info');
+      break;
+
+    case 'peach': // 🍑 +1 heart
+      state.items.peach--;
+      Sound.itemUse();
+      state.hearts = Math.min(state.maxHearts, state.hearts + 1);
+      showToast('🍑 人参果：回复1条命！','success');
+      render();
+      startTimer(state.timeLeft);
+      break;
+
+    case 'staff': // 🏏 Only useful in boss (auto-triggered)
+      if(level.type !== 'boss'){
+        showToast('🏏 金箍棒只在BOSS战中使用','info');
+        return;
+      }
+      // Handled in handleWrong
+      break;
+  }
+
+  // Animate item slot
+  setTimeout(()=>{
+    const slots = $$('.item-slot');
+    const names = ['kasaya','curse','cloud','eyes','peach','staff'];
+    const idx = names.indexOf(key);
+    if(idx>=0 && slots[idx]) {
+      slots[idx].classList.add('used');
+      setTimeout(()=>slots[idx].classList.remove('used'),400);
+    }
+  },50);
+}
+
+function getItemName(key){
+  const map = {kasaya:'锦斓袈裟',curse:'紧箍咒',cloud:'筋斗云',eyes:'火眼金睛',peach:'人参果',staff:'金箍棒'};
+  return map[key]||key;
+}
+
+function scrollMapToCurrent(){
+  setTimeout(()=>{
+    const scroll = $('#mapScroll');
+    if(scroll){
+      const cn = scroll.querySelector('.current');
+      if(cn) cn.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+    }
+  },150);
+}
+
+function resetGame(){
+  stopTimer();
+  initGame();
+}
+
+function toggleSound(){
+  Sound.toggle();
+  const btn = $('.sound-btn');
+  if(btn) btn.textContent = Sound.enabled ? '🔊' : '🔇';
+}
+
+// ============ Keyboard Shortcuts ============
+document.addEventListener('keydown',(e)=>{
+  if(state.gameOver || state.gameWin) return;
+  const key = e.key.toUpperCase();
+
+  // Item hotkeys
+  if(key === 'Q') useItem('kasaya');
+  if(key === 'W') useItem('curse');
+  if(key === 'E') useItem('cloud');
+  if(key === 'R') useItem('eyes');
+  if(key === 'T') useItem('peach');
+  if(key === 'Y') useItem('staff');
+
+  // Answer hotkeys (1-4)
+  if(!state.answered && state.levelQuestions.length > 0 && state.levelQuestionIdx < state.levelQuestions.length){
+    if(key === '1') answerQuestion(0);
+    if(key === '2') answerQuestion(1);
+    if(key === '3') answerQuestion(2);
+    if(key === '4') answerQuestion(3);
+  }
+
+  // Space to continue
+  if(key === ' ' && state.answered){
+    e.preventDefault();
+    nextQuestion();
+  }
+});
+
+// ============ Initialize ============
+initGame();
+</script>
+</body>
+</html>
