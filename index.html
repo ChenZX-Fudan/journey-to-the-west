@@ -445,6 +445,8 @@ const state = {
   gameOver: false,
   gameWin: false,
   visitedLevels: new Set(),
+  usedQuestionIndices: new Set(), // globally track used questions to avoid repeats
+  _lastQuestion: null,   // the question object just answered (for accurate feedback)
 };
 
 // ============ DOM Helpers ============
@@ -471,9 +473,21 @@ function shuffle(arr){
 
 // ============ Question Selection ============
 function pickQuestionsForLevel(level, count){
-  // Pick `count` random questions, avoiding repeats within the level
-  const pool = shuffle(QUESTIONS);
-  return pool.slice(0, Math.min(count, pool.length));
+  // Pick `count` random questions, avoiding previously used ones globally
+  const available = [];
+  for(let i=0; i<QUESTIONS.length; i++){
+    if(!state.usedQuestionIndices.has(i)) available.push(i);
+  }
+  // If not enough unused questions, reset the pool
+  if(available.length < count){
+    state.usedQuestionIndices.clear();
+    for(let i=0; i<QUESTIONS.length; i++) available.push(i);
+  }
+  const shuffled = shuffle(available);
+  const picked = shuffled.slice(0, Math.min(count, shuffled.length));
+  // Mark as used
+  picked.forEach(i => state.usedQuestionIndices.add(i));
+  return picked.map(i => QUESTIONS[i]);
 }
 
 // ============ Timer ============
@@ -523,7 +537,7 @@ function render(){
     <div class="status-bar">
       <div class="status-item">
         <span class="label">📍</span>
-        <span class="value">第${state.currentLevel+1}关 · ${LEVELS[state.currentLevel].name}</span>
+        <span class="value">${state.gameWin?'🏆 取经成功':state.gameOver?'💀 取经失败':`第${state.currentLevel+1}关 · ${LEVELS[state.currentLevel].name}`}</span>
       </div>
       <div class="status-item">
         <span class="label">❤️</span>
@@ -609,15 +623,21 @@ function renderMapNode(level, index){
 }
 
 function renderQuestionArea(){
-  const level = LEVELS[state.currentLevel];
-  const typeCls = level.type+'-type';
-
   let questionHTML = '';
   if(state.gameWin){
     questionHTML = renderVictory();
-  } else if(state.gameOver){
+    return `<div style="text-align:center;padding:20px;">${questionHTML}</div>`;
+  }
+  if(state.gameOver){
     questionHTML = renderDefeat();
-  } else if(state.answered){
+    return `<div style="text-align:center;padding:20px;">${questionHTML}</div>`;
+  }
+
+  const level = LEVELS[state.currentLevel];
+  if(!level) return `<p style="text-align:center;color:var(--red);">关卡数据异常</p>`;
+  const typeCls = level.type+'-type';
+
+  if(state.answered){
     questionHTML = renderAnswered();
   } else if(state.levelQuestions.length === 0){
     questionHTML = renderLevelIntro();
@@ -662,8 +682,11 @@ function renderLevelIntro(){
 }
 
 function renderActiveQuestion(){
-  if(state.levelQuestionIdx >= state.levelQuestions.length) return renderLevelIntro();
+  if(state.levelQuestionIdx >= state.levelQuestions.length) {
+    return renderLevelIntro();
+  }
   const q = state.levelQuestions[state.levelQuestionIdx];
+  if(!q || !q.opts) return `<p style="text-align:center;color:var(--red);margin:20px;">题目加载失败，请刷新页面重试</p>`;
   const level = LEVELS[state.currentLevel];
   const eliminated = state._eliminated || [];
 
@@ -702,7 +725,7 @@ function renderActiveQuestion(){
 }
 
 function renderAnswered(){
-  const q = state.levelQuestions[state.levelQuestionIdx - 1] || state.levelQuestions[state.levelQuestionIdx];
+  const q = state._lastQuestion;
   if(!q) return renderLevelIntro();
   const level = LEVELS[state.currentLevel];
   return `
@@ -779,8 +802,10 @@ function initGame(){
   state.gameOver = false;
   state.gameWin = false;
   state.visitedLevels = new Set();
+  state.usedQuestionIndices = new Set();
   state._eliminated = [];
   state._lastCorrect = null;
+  state._lastQuestion = null;
   stopTimer();
   render();
   showStartOverlay();
@@ -829,6 +854,7 @@ function startLevel(){
   state.answered = false;
   state._eliminated = [];
   state._lastCorrect = null;
+  state._lastQuestion = null;
   render();
 
   // If there are questions, start the first one
@@ -840,32 +866,27 @@ function startLevel(){
 
 function answerQuestion(choiceIdx){
   if(state.answered) return;
+  const q = state.levelQuestions[state.levelQuestionIdx];
+  if(!q || !q.opts) return;
   state.answered = true;
   stopTimer();
   Sound.click();
 
-  const q = state.levelQuestions[state.levelQuestionIdx];
-  const isCorrect = choiceIdx === q.ans;
-  state._lastCorrect = isCorrect;
+  state._lastQuestion = {q: q.q, opts: [...q.opts], ans: q.ans};
+  state._lastCorrect = (choiceIdx === q.ans);
 
-  // Highlight options
-  const btns = $$('.option-btn');
-  btns.forEach((btn,i)=>{
-    btn.disabled = true;
-    if(i === q.ans) btn.classList.add('correct');
-    if(i === choiceIdx && !isCorrect) btn.classList.add('wrong');
-    if(i === choiceIdx && isCorrect) btn.classList.add('correct');
-    else if(!isCorrect && i === q.ans) btn.classList.add('reveal-correct');
-  });
-
-  if(isCorrect){
+  if(state._lastCorrect){
     handleCorrect();
   } else {
     handleWrong();
   }
 
-  render();
-  scrollMapToCurrent();
+  // handleCorrect/handleWrong may have already called advanceLevel + render.
+  // Only render here if we didn't advance (answered still true = feedback screen).
+  if(state.answered && !state.gameOver && !state.gameWin){
+    render();
+    scrollMapToCurrent();
+  }
 }
 
 function handleCorrect(){
@@ -874,14 +895,10 @@ function handleCorrect(){
   state.combo++;
   if(state.combo > state.maxCombo) state.maxCombo = state.combo;
 
-  // Score: base + combo bonus + time bonus
   const timeBonus = Math.floor(state.timeLeft / 5);
   const comboBonus = Math.floor(state.combo / 3);
-  const points = 100 + timeBonus * 10 + comboBonus * 20;
-  state.score += points;
+  state.score += 100 + timeBonus * 10 + comboBonus * 20;
 
-  // Continuous correct = item reward every 3
-  const totalCorrect = state.score > 0 ? Math.floor(state.score / 300) : 0; // roughly every 3 correct answers
   if(state.combo > 0 && state.combo % 3 === 0) {
     const itemKeys = ['kasaya','curse','cloud','peach'];
     const key = itemKeys[Math.floor(Math.random()*itemKeys.length)];
@@ -891,18 +908,26 @@ function handleCorrect(){
   }
 
   state.levelQuestionIdx++;
+  const done = state.levelQuestionIdx >= level.questions;
 
-  // Handle per level type
+  // --- Level-complete types (advance immediately on finishing) ---
   if(level.type === 'boss'){
     state.bossCorrectStreak++;
     if(state.bossCorrectStreak >= level.questions){
-      // Boss defeated!
       showToast(`⚔️ ${level.bossName} 被击败！`,'success');
       Sound.levelUp();
-      advanceLevel();
+      advanceLevel(); // advanceLevel sets answered=false and calls render
       return;
     }
-  } else if(level.type === 'maze'){
+    state.answered = false;
+    state._eliminated = [];
+    startTimer(level.timer);
+    render();
+    scrollMapToCurrent();
+    return;
+  }
+
+  if(level.type === 'maze'){
     state.mazePosition++;
     if(state.mazePosition >= level.mazeSize){
       showToast('🕸️ 走出了盘丝洞！','success');
@@ -910,41 +935,42 @@ function handleCorrect(){
       advanceLevel();
       return;
     }
-    // Continue maze - new question
     state.levelQuestions = pickQuestionsForLevel(level, 1);
     state.levelQuestionIdx = 0;
-  } else if(level.type === 'tribulation'){
+    state.answered = false;
+    state._eliminated = [];
+    startTimer(level.timer);
+    render();
+    scrollMapToCurrent();
+    return;
+  }
+
+  if(level.type === 'tribulation'){
     showToast('🐢 老鼋满意答案，驮你过河！','success');
     Sound.levelUp();
     advanceLevel();
     return;
-  } else if(level.type === 'treasure'){
-    // Grant a random treasure item
+  }
+
+  if(level.type === 'treasure'){
     const treasurePool = ['kasaya','cloud','eyes','peach','curse','staff'];
-    const treasureKey = treasurePool[Math.floor(Math.random()*treasurePool.length)];
-    state.items[treasureKey]++;
-    showToast(`🌳 摇动人参果树！获得 ${getItemName(treasureKey)} +1！`,'success');
+    const key = treasurePool[Math.floor(Math.random()*treasurePool.length)];
+    state.items[key]++;
+    showToast(`🌳 摇动人参果树！获得 ${getItemName(key)} +1！`,'success');
     Sound.itemUse();
     Sound.levelUp();
     advanceLevel();
     return;
-  } else {
-    // Normal quiz or final - check if level complete
-    if(state.levelQuestionIdx >= level.questions){
-      Sound.levelUp();
-      advanceLevel();
-      return;
-    }
-    // Quiz/final: stay on answered screen, let user click Continue
+  }
+
+  // --- quiz / final: only advance when ALL questions done ---
+  if(done){
+    Sound.levelUp();
+    advanceLevel();
     return;
   }
 
-  // Auto-advance for boss/maze (rapid-fire flow)
-  state.answered = false;
-  state._eliminated = [];
-  render();
-  startTimer(level.timer);
-  scrollMapToCurrent();
+  // Still more questions in this level → show feedback, user clicks Continue
 }
 
 function handleWrong(){
@@ -952,7 +978,7 @@ function handleWrong(){
   const level = LEVELS[state.currentLevel];
   state.combo = 0;
 
-  // Check if staff (金箍棒) can nullify
+  // Staff nullify (boss only)
   if(level.type === 'boss' && state.items.staff > 0){
     state.items.staff--;
     showToast('🏏 金箍棒抵消了这次答错！','info');
@@ -970,8 +996,8 @@ function handleWrong(){
     state.levelQuestions = pickQuestionsForLevel(level, level.questions - state.levelQuestionIdx);
     if(state.levelQuestions.length === 0) state.levelQuestions = pickQuestionsForLevel(level, 1);
     state.levelQuestionIdx = 0;
-    render();
     startTimer(level.timer);
+    render();
     scrollMapToCurrent();
     return;
   }
@@ -980,7 +1006,6 @@ function handleWrong(){
   const penalty = level.type === 'tribulation' ? (level.penaltyHearts || 2) : 1;
   state.hearts -= penalty;
   if(state.hearts < 0) state.hearts = 0;
-
   showToast(`❌ 答错了！扣 ${penalty} 条命`,'error');
 
   if(state.hearts <= 0){
@@ -988,31 +1013,31 @@ function handleWrong(){
     stopTimer();
     Sound.defeat();
     render();
+    scrollMapToCurrent();
     return;
   }
 
-  // Reset for retry (same level position)
+  // Reset for retry
   if(level.type === 'boss'){
-    state.bossCorrectStreak = 0; // Reset boss streak
+    state.bossCorrectStreak = 0;
     state.levelQuestions = pickQuestionsForLevel(level, level.questions);
     state.levelQuestionIdx = 0;
     state.answered = false;
     state._eliminated = [];
-    render();
     startTimer(level.timer);
+    render();
     scrollMapToCurrent();
   } else if(level.type === 'maze'){
-    state.mazePosition = Math.max(0, state.mazePosition - 1); // Move back
+    state.mazePosition = Math.max(0, state.mazePosition - 1);
     state.levelQuestions = pickQuestionsForLevel(level, 1);
     state.levelQuestionIdx = 0;
     state.answered = false;
     state._eliminated = [];
-    render();
     startTimer(level.timer);
+    render();
     scrollMapToCurrent();
   } else {
-    // For quiz/final/treasure: replace failed question, keep progress
-    // Stay on answered screen, let user click Continue
+    // quiz/final/treasure: replace this question, stay on feedback
     state.levelQuestions[state.levelQuestionIdx] = pickQuestionsForLevel(level, 1)[0];
   }
 }
@@ -1020,6 +1045,9 @@ function handleWrong(){
 function handleTimeout(){
   if(state.answered) return;
   state.answered = true;
+  const q = state.levelQuestions[state.levelQuestionIdx];
+  if(!q) return;
+  state._lastQuestion = {q: q.q, opts: [...q.opts], ans: q.ans}; // COPY
   state._lastCorrect = false;
   Sound.wrong();
   const level = LEVELS[state.currentLevel];
@@ -1029,47 +1057,49 @@ function handleTimeout(){
   if(state.hearts < 0) state.hearts = 0;
   showToast('⏰ 时间到！','error');
 
-  const q = state.levelQuestions[state.levelQuestionIdx];
-  const btns = $$('.option-btn');
-  btns.forEach((btn,i)=>{
-    btn.disabled = true;
-    if(i === q.ans) btn.classList.add('reveal-correct');
-  });
-
   if(state.hearts <= 0){
     state.gameOver = true;
     stopTimer();
     Sound.defeat();
     render();
+    scrollMapToCurrent();
     return;
   }
 
-  if(level.type === 'boss') state.bossCorrectStreak = 0;
-  if(level.type === 'maze') state.mazePosition = Math.max(0, state.mazePosition - 1);
-
-  render();
-  // Auto-continue after timeout
-  setTimeout(()=>{
-    if(!state.gameOver && !state.gameWin){
-      const rem = level.type==='boss'?level.questions:level.type==='maze'?1:level.questions-state.levelQuestionIdx;
-      state.levelQuestions = pickQuestionsForLevel(level, Math.max(1,rem));
-      state.levelQuestionIdx = 0;
-      state.answered = false;
-      state._eliminated = [];
-      render();
-      startTimer(level.timer);
-      scrollMapToCurrent();
-    }
-  }, 2000);
+  if(level.type === 'boss'){
+    state.bossCorrectStreak = 0;
+    state.levelQuestions = pickQuestionsForLevel(level, level.questions);
+    state.levelQuestionIdx = 0;
+    state.answered = false;
+    state._eliminated = [];
+    startTimer(level.timer);
+    render();
+    scrollMapToCurrent();
+  } else if(level.type === 'maze'){
+    state.mazePosition = Math.max(0, state.mazePosition - 1);
+    state.levelQuestions = pickQuestionsForLevel(level, 1);
+    state.levelQuestionIdx = 0;
+    state.answered = false;
+    state._eliminated = [];
+    startTimer(level.timer);
+    render();
+    scrollMapToCurrent();
+  } else {
+    // quiz/final/treasure: replace current question, keep feedback
+    state.levelQuestions[state.levelQuestionIdx] = pickQuestionsForLevel(level, 1)[0];
+    render();
+    scrollMapToCurrent();
+  }
 }
 
 function advanceLevel(){
   stopTimer();
   state.currentLevel++;
   state.visitedLevels.add(state.currentLevel - 1);
+  state._lastQuestion = null;
+  state._lastCorrect = null;
 
   if(state.currentLevel >= LEVELS.length){
-    // WIN!
     state.gameWin = true;
     Sound.victory();
     render();
@@ -1089,6 +1119,7 @@ function nextQuestion(){
   const level = LEVELS[state.currentLevel];
   if(state.gameOver || state.gameWin) return;
 
+
   // If we just finished a level's last question
   if(level.type === 'quiz' || level.type === 'treasure' || level.type === 'final'){
     if(state.levelQuestionIdx >= level.questions){
@@ -1099,6 +1130,7 @@ function nextQuestion(){
 
   state.answered = false;
   state._eliminated = [];
+  state._lastQuestion = null;  // clear to prevent stale feedback
   render();
   startTimer(level.timer);
   scrollMapToCurrent();
@@ -1124,6 +1156,7 @@ function useItem(key){
       } else {
         state.answered = false;
         state._eliminated = [];
+        state._lastQuestion = null;
         render();
         startTimer(level.timer);
         scrollMapToCurrent();
