@@ -294,18 +294,6 @@
 
 ---
 
-## 📁 文件结构
-
-```
-journey-to-the-west-game/
-├── index.html       ← 游戏主文件（纯前端，双击即玩）
-├── design.md        ← 游戏设计文档
-├── 题库答案.md       ← 500 题完整题目与正确答案
-└── README.md        ← 本文件
-```
-
----
-
 ## 🛠️ 技术说明
 
 - **纯前端**：HTML + CSS + JavaScript，单文件
